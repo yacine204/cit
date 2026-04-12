@@ -1,4 +1,4 @@
-# cit
+# cit (still underwork)
 
 a version control system written in C from scratch — no tutorials, no copying git's internals, just reasoning through the problem.
 
