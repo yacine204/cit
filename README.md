@@ -21,21 +21,19 @@ graph RL
 
 each commit holds a snapshot of the tree at that point in time:
 
-```mermaid
-graph RL
-    C3[commit 3\nHEAD] --> C2[commit 2]
-    C2 --> C1[commit 1\ninitial]
-```
 
 ```mermaid
-graph TD
-    C1[commit 1 - initial] --> R1[root]
+graph LR
+    C1[commit 1 - initial] --> C2[commit 2]
+    C2 --> C3[commit 3 - HEAD]
+
+    C1 --> R1[root]
     R1 --> S1[src]
     R1 --> I1[include]
     S1 --> A1[main.c]
     I1 --> B1[tree.h]
 
-    C2[commit 2] --> R2[root]
+    C2 --> R2[root]
     R2 --> S2[src]
     R2 --> I2[include]
     S2 --> A2[main.c]
@@ -43,7 +41,7 @@ graph TD
     I2 --> B2[tree.h]
     I2 --> D2[commit.h - added]
 
-    C3[commit 3 - HEAD] --> R3[root]
+    C3 --> R3[root]
     R3 --> S3[src]
     R3 --> I3[include]
     S3 --> A3[main.c - modified]
