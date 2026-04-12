@@ -106,7 +106,7 @@ char *generateChanges(struct commit *commit){
     return change;
 }
 
-struct commit findCOmmitsFromNodeHash(char nodeHash){
+struct commit *findCOmmitsFromNodeHash(char nodeHash){
     struct commit *commit;
     int commitTreeNodeCount = 0;
     bool found = false;
@@ -117,7 +117,7 @@ struct commit findCOmmitsFromNodeHash(char nodeHash){
             if(strcmp(commit->commit_tree.nodes[i]->hash, nodeHash)==0) found = true;
         }
 
-        if(found) return *commit;
+        if(found) return commit;
         else{
             commit = commit->parent;
         }
@@ -133,7 +133,7 @@ struct node *CreateNode(char *context, char *filename,  enum NodeType nodeType){
     strcpy(new_node->file_name, filename);
 
     if(nodeType == FILE_NODE){
-        struct commit parentOfNode = findCOmmitsFromNodeHash(new_node->hash);
+        struct commit *parentOfNode = findCOmmitsFromNodeHash(new_node->hash);
         char *changes = generateChanges(&parentOfNode);
         
         *new_node= (struct node){
@@ -190,7 +190,6 @@ struct tree *CreateTree(char *root_path) {
             buffer[size] = '\0';
             fclose(f);
             struct node *node = CreateNode(buffer, entry->d_name, FILE_NODE);
-            hash_node(node);
             tree->nodes[tree->node_count++] = node;
         }
     }

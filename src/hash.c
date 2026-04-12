@@ -6,9 +6,7 @@
 //TODO: use sha/ssl
 
 void hash_node(struct node *node) {
-
     //node:<timestamp><filename>
-    char hash[1024];
-    snprintf(hash, sizeof(hash), "<node>:<%ld><%s>",node->created_at, node->file_name);
-    return hash;
+    snprintf(node->hash, sizeof(node->hash), "<node>:<%ld><%s>",node->created_at, node->file_name);
+
 }
