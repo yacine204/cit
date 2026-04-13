@@ -26,7 +26,8 @@ struct tree{
     struct tree *sub_trees[100];
 };
 
-struct node *CreateNode(char *context, char *changes,char *filename, enum NodeType nodeType); 
+struct node *CreateNode(char *context ,char *filename, enum NodeType nodeType); 
 struct tree *CreateTree(char *root_path); 
+char *diff(char *old, char *new);
 
 #endif
