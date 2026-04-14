@@ -22,69 +22,14 @@ static int split_lines(char *text, char **lines, int max_lines) {
     return count;
 }
 
+// TODO: redo the diff logic
+
 char *diff(char *old, char *new) {
     
-    size_t old_sz = strlen(old) + 1;
-    size_t new_sz = strlen(new) + 1;
-    char *old_copy = malloc(old_sz);
-    char *new_copy = malloc(new_sz);
-    if (!old_copy || !new_copy) { free(old_copy); free(new_copy); return NULL; }
-    memcpy(old_copy, old, old_sz);
-    memcpy(new_copy, new, new_sz);
- 
-    char *old_lines[256], *new_lines[256];
-    int m = split_lines(old_copy, old_lines, 256);
-    int n = split_lines(new_copy, new_lines, 256);
- 
-    // build LCS table
-    int dp[m + 1][n + 1];
-    for (int i = 0; i <= m; i++)
-        for (int j = 0; j <= n; j++) {
-            if (i == 0 || j == 0)
-                dp[i][j] = 0;
-            else if (strcmp(old_lines[i-1], new_lines[j-1]) == 0)
-                dp[i][j] = dp[i-1][j-1] + 1;
-            else
-                dp[i][j] = dp[i-1][j] > dp[i][j-1] ? dp[i-1][j] : dp[i][j-1];
-        }
- 
-    // traceback (stored reversed)
-    char temp_lines[256][512];
-    char temp_prefix[256];
-    int count = 0;
-    int i = m, j = n;
- 
-    while (i > 0 || j > 0) {
-        if (i > 0 && j > 0 && strcmp(old_lines[i-1], new_lines[j-1]) == 0) {
-            temp_prefix[count] = ' ';
-            strncpy(temp_lines[count++], old_lines[i-1], 511);
-            i--; j--;
-        } else if (j > 0 && (i == 0 || dp[i][j-1] >= dp[i-1][j])) {
-            temp_prefix[count] = '+';
-            strncpy(temp_lines[count++], new_lines[j-1], 511);
-            j--;
-        } else {
-            temp_prefix[count] = '-';
-            strncpy(temp_lines[count++], old_lines[i-1], 511);
-            i--;
-        }
-    }
- 
-    // build result string
-    size_t result_sz = (count + 1) * 520;
-    char *result = malloc(result_sz);
-    if (!result) { free(old_copy); free(new_copy); return NULL; }
-    result[0] = '\0';
- 
-    for (int k = count - 1; k >= 0; k--) {
-        char line[520];
-        snprintf(line, sizeof(line), "%c %s\n", temp_prefix[k], temp_lines[k]);
-        strncat(result, line, result_sz - strlen(result) - 1);
-    }
- 
-    free(old_copy);
-    free(new_copy);
-    return result; // caller must free
+    size_t old_context_len = strlen(old);
+    size_t new_context_len = strlen(new);
+
+
 }
 
 
