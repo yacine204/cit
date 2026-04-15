@@ -10,51 +10,88 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <stdio.h>
+
 //helpers
+int countLines(char *buffer){
+    int counter = 0;
+    char *copy = strdup(buffer);
+    char *token = strtok(copy, "\n");
 
-static int split_lines(char *text, char **lines, int max_lines) {
-    int count = 0;
-    char *line = strtok(text, "\n");
-    while (line != NULL && count < max_lines) {
-        lines[count++] = line;
-        line = strtok(NULL, "\n");
+    while(token != NULL){
+        counter ++;
+        token = strtok(NULL, "\n");
+        
     }
-    return count;
+    free(copy);
+    return counter;
 }
 
-// TODO: redo the diff logic
+char **split_lines(char *buffer) {
 
-char *diff(char *old, char *new) {
+    int capacity = countLines(buffer);
+    char **lines = malloc(capacity*(sizeof(char *)));
+    char *copy = strdup(buffer);
+    char *token = strtok(copy, "\n");
     
-    size_t old_context_len = strlen(old);
-    size_t new_context_len = strlen(new);
 
+    for(int i=0; i<capacity; i++){
+        lines[i] = strdup(token);
+        token = strtok(NULL, "\n");
+    }
 
+    return lines;
 }
 
 
+char *generate_changes(char *old, char*new){
+    //if new has has strings added on the indexes + the max len of the old then automatically make it an add on
+    //if we find non similar lines before max len of old buffer we do:
+    // +new buffer line
+    // -old buffer line
 
-char *generateChanges(struct commit *commit){
-    if (commit == NULL) return NULL;
-    char *change = NULL;
-    if (commit->parent != NULL){
+    int old_len = countLines(old);
+    int new_len = countLines(new);
 
-        struct tree *tree_temp = commit->commit_tree;
-        struct commit *commit_temp = commit->parent;
-        for(int i=0; i< commit->commit_tree->node_count; i++){
-            
-            if (strcmp(tree_temp->nodes[i]->context, commit_temp->commit_tree->nodes[i]->context)!=0
-                && strcmp(tree_temp->nodes[i]->file_name,commit_temp->commit_tree->nodes[i]->file_name)==0){
-                    
-                    change = diff(tree_temp->nodes[i]->context,commit_temp->commit_tree->nodes[i]->context);
-                }
-                
+    char **lined_old = split_lines(old);
+    char **lined_new = split_lines(new);
+
+    
+
+    int changes_size = strlen(old) + strlen(new) + 10;
+    char *changes = malloc(changes_size);
+    changes[0]= '\0';
+    
+    int offset = 0;
+
+    int min_len = old_len < new_len ? old_len : new_len;
+
+    for(int i=0; i<min_len; i++){
+        if(strcmp(lined_old[i],lined_new[i])!=0){
+            offset += snprintf(changes+offset, changes_size - offset, "-%s\n+%s\n", lined_old[i], lined_new[i]);
         }
     }
-    return change;
+
+    // deleted
+    for (int i = min_len; i < old_len; i++) {
+        offset += snprintf(changes + offset, changes_size - offset,
+                           "-%s\n", lined_old[i]);
+    }
+    // add ons
+    for (int i = min_len; i < new_len; i++) {
+        offset += snprintf(changes + offset, changes_size - offset,
+                           "+%s\n", lined_new[i]);
+    }
+
+    for (int i = 0; i < old_len; i++) free(lined_old[i]);
+    free(lined_old);
+    for (int i = 0; i < new_len; i++) free(lined_new[i]);
+    free(lined_new);
+
+    printf("%s", changes);
+    return changes;
 }
 
-struct commit *findCommitsFromNodeHash(struct commit *head,char *nodeHash){
+struct commit *findCommitFromNodeHash(struct commit *head,char *nodeHash){
     struct commit *commit = head;
     int commitTreeNodeCount = 0;
     
@@ -74,20 +111,30 @@ struct commit *findCommitsFromNodeHash(struct commit *head,char *nodeHash){
 struct node *CreateNode(char *context, char *filename, enum NodeType nodeType){
     //if folder we only care ab name and creation timestamp
     struct node *new_node = malloc(sizeof(struct node));
+
     new_node->created_at = time(NULL);
     new_node->nodeType = nodeType;
-    new_node->context = context;       
-    strcpy(new_node->file_name, filename);
+    new_node->context = context;    
+
+    new_node->nodeHeader = malloc(sizeof(struct nodeHeader));
+
+    strcpy(new_node->nodeHeader->fileName, filename);
+
     new_node->changes = NULL;
+
     hash_node(new_node);
 
     if(nodeType == FILE_NODE){
-        struct commit *parentOfNode = findCommitsFromNodeHash(NULL,new_node->hash);
+        struct commit *node_parent = findCommitFromNodeHash(NULL,new_node->hash);
         
         
-        if (parentOfNode != NULL){
-            char *changes = generateChanges(parentOfNode);
-            new_node->changes = changes;
+        if (node_parent != NULL){
+            //get the same node from the parent of the node parent
+            struct commit *node_parent_parent = node_parent->parent;
+            
+            //TODO: access the node in the node_parent_parent
+        }else{
+            new_node->nodeHeader->index = 0;
         }
     }
 

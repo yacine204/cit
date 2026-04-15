@@ -9,12 +9,17 @@ enum NodeType{
     FILE_NODE
 };
 
+struct nodeHeader{
+    char *fileName;
+    size_t index;
+};
+
 struct node{
+    struct nodeHeader *nodeHeader;
     enum NodeType nodeType;
     char *context;
     char hash[256];
     char *changes;
-    char file_name[256];
     time_t created_at;
 };
 
