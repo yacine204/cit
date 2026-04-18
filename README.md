@@ -45,3 +45,9 @@ Commit files are human-readable text with:
 - all files in the repository (excluding `.cit/` and `.git/`)
 - line-by-line changes between commits
 - full file history in each commit snapshot 
+
+## TODO 
+- [ ] cli loop
+- [ ] diff
+- [ ] checkout
+- [ ] branch & switch
