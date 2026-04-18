@@ -259,29 +259,34 @@ struct commit *read_from_binary(char *file_path){
 }
 
 struct node *old_node_version(struct node *currentNode){
-    // TODO: Fix this function - for now, return NULL to avoid hanging
-    return NULL;
-    /*
+    // retrieve the old version of a node from the last commit
     char *latest_commit_file_name = last_commit();
     if (latest_commit_file_name == NULL) return NULL;
 
-    char commit_path[512];
-    snprintf(commit_path, sizeof(commit_path), ".cit/%s", latest_commit_file_name);
+    char commit_path[2048];
+    snprintf(commit_path, sizeof(commit_path), "%s/.cit/%s", g_cwd, latest_commit_file_name);
     free(latest_commit_file_name);
 
     struct commit *commit = read_from_binary(commit_path);
     if (commit == NULL) return NULL;
 
-    struct node *old_version = malloc(sizeof(struct node));
+    struct node *old_version = NULL;
+    // search for the file in the commit tree
     for(int i=0; i<commit->commit_tree->node_count; i++){
         if(strcmp(currentNode->nodeHeader->fileName, commit->commit_tree->nodes[i]->nodeHeader->fileName)==0){
-            memcpy(old_version, commit->commit_tree->nodes[i], sizeof(struct node));
-            return old_version;
+            old_version = malloc(sizeof(struct node));
+            if(old_version != NULL) {
+                memcpy(old_version, commit->commit_tree->nodes[i], sizeof(struct node));
+                
+                old_version->nodeHeader->fileName = strdup(commit->commit_tree->nodes[i]->nodeHeader->fileName);
+                old_version->context = strdup(commit->commit_tree->nodes[i]->context ? commit->commit_tree->nodes[i]->context : "");
+                old_version->changes = strdup(commit->commit_tree->nodes[i]->changes ? commit->commit_tree->nodes[i]->changes : "");
+            }
+            break;
         }
     }
-    free(old_version);
-    return NULL;
-    */
+    
+    return old_version;
 }
 
 struct node *CreateNode(char *context, char *filename, enum NodeType nodeType){
