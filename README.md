@@ -30,13 +30,6 @@ gcc -o main main.c src/tree.c src/commit.c src/hash.c
 ./main . commit "your commit message"
 ```
 
-### usage
-
-After initialization, track your changes and commit them:
-```bash
-./main . commit "message"  # create a commit with all tracked files
-```
-
 ### commit file format
 
 See [examples/commit_diff.txt](examples/commit_diff.txt) for a detailed example of what a commit file looks like. (or u can directly check the binaries in .cit/ folder, theyre readable txt format).
