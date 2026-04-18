@@ -39,7 +39,7 @@ After initialization, track your changes and commit them:
 
 ### commit file format
 
-See [examples/commit_diff.txt](examples/commit_diff.txt) for a detailed example of what a commit file looks like.
+See [examples/commit_diff.txt](examples/commit_diff.txt) for a detailed example of what a commit file looks like. (or u can directly check the binaries in .cit/ folder, theyre readable txt format).
 
 Commit files are human-readable text with:
 - **##commit** header: metadata (timestamp, tree count, node count)
