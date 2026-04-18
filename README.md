@@ -26,7 +26,7 @@ cit tracks changes using a custom N-ary tree structure (Rose tree):
 
 ### commit file format
 
-See [examples/sample_commit.txt](examples/sample_commit.txt) for a detailed example of what a commit file looks like.
+See [examples/commit_diff.txt](examples/commit_diff.txt) for a detailed example of what a commit file looks like.
 
 Commit files are human-readable text with:
 - **##commit** header: metadata (timestamp, tree count, node count)
