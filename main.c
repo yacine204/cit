@@ -14,7 +14,6 @@
 
 extern char *g_cwd;
 
-//should be in changes
 int main(int argc, char *argv[]) {
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) == NULL) {
@@ -72,3 +71,4 @@ int main(int argc, char *argv[]) {
     free(g_cwd);
     return 0;
 }
+// comment in main should appear as +
