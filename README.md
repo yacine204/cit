@@ -18,8 +18,21 @@ cit tracks changes using a custom N-ary tree structure (Rose tree):
   - **context**: full file content for that commit
 - commits form a linked list where each commit has a reference to its parent
 
+### build and run
+
+**Compile:**
+```bash
+gcc -o main main.c src/tree.c src/commit.c src/hash.c
+```
+
+**Create a commit:**
+```bash
+./main . commit "your commit message"
+```
+
 ### usage
 
+After initialization, track your changes and commit them:
 ```bash
 ./main . commit "message"  # create a commit with all tracked files
 ```
@@ -38,4 +51,4 @@ Commit files are human-readable text with:
 
 - all files in the repository (excluding `.cit/` and `.git/`)
 - line-by-line changes between commits
-- full file history in each commit snapshot
+- full file history in each commit snapshot 
