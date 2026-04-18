@@ -30,8 +30,15 @@ struct tree{
     struct tree **sub_trees;
 };
 
+struct commit;
+
+int count_lines(char *buffer);
+char **split_lines(char *buffer);
+char *generate_changes(char *old, char *new);
+char* last_commit(void);
+struct node *old_node_version(struct node *currentNode);
 struct node *CreateNode(char *context ,char *filename, enum NodeType nodeType); 
 struct tree *CreateTree(char *root_path); 
-char *diff(char *old, char *new);
+struct commit *read_from_binary(char *file_path);
 
 #endif

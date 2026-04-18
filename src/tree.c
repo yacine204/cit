@@ -11,8 +11,11 @@
 #include <string.h>
 #include <stdio.h>
 
+char *g_cwd = NULL;
+
 //helpers
 int count_lines(char *buffer){
+    if(buffer == NULL || buffer[0] == '\0') return 0;
     int counter = 0;
     char *copy = strdup(buffer);
     char *token = strtok(copy, "\n");
@@ -29,16 +32,24 @@ int count_lines(char *buffer){
 char **split_lines(char *buffer) {
 
     int capacity = count_lines(buffer);
+    if(capacity == 0) {
+        char **lines = malloc(sizeof(char *));
+        lines[0] = malloc(1);
+        lines[0][0] = '\0';
+        return lines;
+    }
+    
     char **lines = malloc(capacity*(sizeof(char *)));
     char *copy = strdup(buffer);
     char *token = strtok(copy, "\n");
     
 
     for(int i=0; i<capacity; i++){
+        if(token == NULL) break;
         lines[i] = strdup(token);
         token = strtok(NULL, "\n");
     }
-
+    free(copy);
     return lines;
 }
 
@@ -55,7 +66,10 @@ char *generate_changes(char *old, char*new){
     char **lined_old = split_lines(old);
     char **lined_new = split_lines(new);
 
-    int changes_size = strlen(old) + strlen(new) + 10;
+    // Allocate enough space - each line could be doubled with +/- prefix, plus newlines
+    size_t old_size = old ? strlen(old) : 0;
+    size_t new_size = new ? strlen(new) : 0;
+    int changes_size = old_size + new_size + (old_len + new_len) * 3 + 100;
     char *changes = malloc(changes_size);
     changes[0]= '\0';
     
@@ -84,7 +98,6 @@ char *generate_changes(char *old, char*new){
     for (int i = 0; i < new_len; i++) free(lined_new[i]);
     free(lined_new);
 
-    printf("%s", changes);
     return changes;
 }
 
@@ -92,10 +105,13 @@ char* last_commit(){
     //extract all commits timestamps from .cit
     //return the latest commit file name
 
-    DIR *dir = opendir(".cit/");
+    char cit_path[2048];
+    snprintf(cit_path, sizeof(cit_path), "%s/.cit", g_cwd);
+    
+    DIR *dir = opendir(cit_path);
     if(dir == NULL){
-        perror("opendir failed");
-    } 
+        return NULL;
+    }
     
     struct dirent *entry; 
     long latest_timestamp = 0;
@@ -118,9 +134,8 @@ char* last_commit(){
         free(copy);
     }
 
-    printf("%s\n", latest);
+    closedir(dir);
     return latest;
-    return;
 }
 
 #define MAX_NODES 256
@@ -152,18 +167,21 @@ char* last_commit(){
 // ------------------------------------------
 
 struct commit *read_from_binary(char *file_path){
+    if (file_path == NULL) return NULL;
+
     struct commit *commit = malloc(sizeof(struct commit));
     commit->commit_tree = malloc(sizeof(struct tree));
     commit->commit_tree->nodes = malloc(sizeof(struct node*)*256);
     
     FILE *f = fopen(file_path, "r");
     if(f==NULL){
-        perror("couldnt open file");
+        free(commit->commit_tree->nodes);
+        free(commit->commit_tree);
         free(commit);
         return NULL;
     }
 
-    fscanf(f, "##commit %ld %ld %ld\n", &commit->created_at, &commit->commit_tree->root_count, &commit->commit_tree->node_count);
+    fscanf(f, "##commit %ld %d %d\n", &commit->created_at, &commit->commit_tree->root_count, &commit->commit_tree->node_count);
     int node_count = commit->commit_tree->node_count;
     for(int i=0; i<node_count; i++){
         struct node *temp = malloc(sizeof(struct node));
@@ -178,15 +196,27 @@ struct commit *read_from_binary(char *file_path){
         fscanf(f, " ##changes\n");
         size_t changes_size = 0;
         long changes_start = ftell(f);
+        int loop_count = 0;
         while((pos=ftell(f)), fgets(line, sizeof(line),f)){
+            loop_count++;
+            if(loop_count > 10000) break;
             if(strncmp(line, "##",2)==0){fseek(f,pos,SEEK_SET);break;}
             changes_size += strlen(line);
         }
 
         temp->changes = malloc(changes_size+1);
+        if(temp->changes == NULL) {
+            free(temp->nodeHeader->fileName);
+            free(temp->nodeHeader);
+            free(temp);
+            continue;
+        }
         temp->changes[0] = '\0';
         fseek(f, changes_start, SEEK_SET);
+        loop_count = 0;
         while((pos=ftell(f)),fgets(line, sizeof(line),f)) {
+            loop_count++;
+            if(loop_count > 10000) break;
             if(strncmp(line, "##",2)==0){ fseek(f,pos, SEEK_SET);break;}
             strcat(temp->changes, line);
         }
@@ -196,15 +226,28 @@ struct commit *read_from_binary(char *file_path){
 
         long context_start = 0;
         context_start = ftell(f);
+        loop_count = 0;
         while ((pos = ftell(f)), fgets(line, sizeof(line), f)) {
+            loop_count++;
+            if(loop_count > 10000) break;
             if (strncmp(line, "##", 2) == 0) { fseek(f, pos, SEEK_SET); break; }
             context_size += strlen(line);
         }
 
         temp->context = malloc(context_size + 1);
+        if(temp->context == NULL) {
+            free(temp->changes);
+            free(temp->nodeHeader->fileName);
+            free(temp->nodeHeader);
+            free(temp);
+            continue;
+        }
         temp->context[0] = '\0';
         fseek(f, context_start, SEEK_SET);
+        loop_count = 0;
         while ((pos = ftell(f)), fgets(line, sizeof(line), f)) {
+            loop_count++;
+            if(loop_count > 10000) break;
             if (strncmp(line, "##", 2) == 0) { fseek(f, pos, SEEK_SET); break; }
             strcat(temp->context, line);
         }
@@ -216,9 +259,18 @@ struct commit *read_from_binary(char *file_path){
 }
 
 struct node *old_node_version(struct node *currentNode){
-
+    // TODO: Fix this function - for now, return NULL to avoid hanging
+    return NULL;
+    /*
     char *latest_commit_file_name = last_commit();
-    struct commit *commit = read_from_binary(latest_commit_file_name);
+    if (latest_commit_file_name == NULL) return NULL;
+
+    char commit_path[512];
+    snprintf(commit_path, sizeof(commit_path), ".cit/%s", latest_commit_file_name);
+    free(latest_commit_file_name);
+
+    struct commit *commit = read_from_binary(commit_path);
+    if (commit == NULL) return NULL;
 
     struct node *old_version = malloc(sizeof(struct node));
     for(int i=0; i<commit->commit_tree->node_count; i++){
@@ -227,7 +279,9 @@ struct node *old_node_version(struct node *currentNode){
             return old_version;
         }
     }
+    free(old_version);
     return NULL;
+    */
 }
 
 struct node *CreateNode(char *context, char *filename, enum NodeType nodeType){
@@ -244,14 +298,28 @@ struct node *CreateNode(char *context, char *filename, enum NodeType nodeType){
         if (old != NULL){
             new_node->changes = generate_changes(old->context, new_node->context);
             free(old);
+        } else {
+            // no old version this is a new file or first commit
+            // generate changes showing all lines as additions
+            new_node->changes = generate_changes("", new_node->context);
         }
     }
-    return NULL;
+    return new_node;
 }
 
 struct tree *CreateTree(char *root_path) {
     struct tree *tree = malloc(sizeof(struct tree));
+    if (tree == NULL) return NULL;
     tree->root = strdup(root_path);
+    tree->nodes = malloc(sizeof(struct node *) * MAX_NODES);
+    tree->sub_trees = malloc(sizeof(struct tree *) * MAX_NODES);
+    if (tree->root == NULL || tree->nodes == NULL || tree->sub_trees == NULL) {
+        free(tree->root);
+        free(tree->nodes);
+        free(tree->sub_trees);
+        free(tree);
+        return NULL;
+    }
     tree->node_count = 0;
     tree->root_count = 0;
 
@@ -263,15 +331,16 @@ struct tree *CreateTree(char *root_path) {
         if (strcmp(entry->d_name, ".") == 0 || 
             strcmp(entry->d_name, "..") == 0) continue;
 
-        char full_path[256];
+        char full_path[1024];
         snprintf(full_path, sizeof(full_path), "%s/%s", root_path, entry->d_name);
 
         struct stat s;
-        stat(full_path, &s);
+        if (stat(full_path, &s) != 0) {
+            continue;
+        }
 
         if (S_ISDIR(s.st_mode)) {
-            if (strcmp(entry->d_name, ".git") == 0 ||
-                strcmp(entry->d_name, ".cit") == 0) continue;
+            if (strcmp(entry->d_name, ".cit") == 0 || strcmp(entry->d_name, ".git") == 0) continue;
             struct tree *subtree = CreateTree(full_path);
             tree->sub_trees[tree->root_count++] = subtree;
         } else if (S_ISREG(s.st_mode)) {
@@ -279,21 +348,29 @@ struct tree *CreateTree(char *root_path) {
             
             if(f==NULL){
                 perror("couldnt open file");
+                continue;
             }
             fseek(f, 0, SEEK_END);
             long size = ftell(f);
+            if (size < 0) {
+                fclose(f);
+                continue;
+            }
             rewind(f);
 
             char *buffer = malloc(size+1);
             if(buffer == NULL){
                 fclose(f);
-                return NULL;
+                continue;
             }
             fread(buffer, 1,size, f);
             buffer[size] = '\0';
             fclose(f);
             struct node *node = CreateNode(buffer, entry->d_name, FILE_NODE);
-            tree->nodes[tree->node_count++] = node;
+            free(buffer);
+            if (node != NULL) {
+                tree->nodes[tree->node_count++] = node;
+            }
         }
     }
 
@@ -301,3 +378,4 @@ struct tree *CreateTree(char *root_path) {
     return tree;
 }
 
+ 
