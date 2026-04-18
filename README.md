@@ -1,6 +1,6 @@
 # cit 
 
-A minimal version control system written in C from scratch. Tracks file changes and creates commits with diffs.
+A custom version control system . Tracks file changes and creates commits with diffs.
 
 ## how it works
 
