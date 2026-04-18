@@ -12,7 +12,7 @@
 #include <stdio.h>
 
 //helpers
-int countLines(char *buffer){
+int count_lines(char *buffer){
     int counter = 0;
     char *copy = strdup(buffer);
     char *token = strtok(copy, "\n");
@@ -28,7 +28,7 @@ int countLines(char *buffer){
 
 char **split_lines(char *buffer) {
 
-    int capacity = countLines(buffer);
+    int capacity = count_lines(buffer);
     char **lines = malloc(capacity*(sizeof(char *)));
     char *copy = strdup(buffer);
     char *token = strtok(copy, "\n");
@@ -49,20 +49,17 @@ char *generate_changes(char *old, char*new){
     // +new buffer line
     // -old buffer line
 
-    int old_len = countLines(old);
-    int new_len = countLines(new);
+    int old_len = count_lines(old);
+    int new_len = count_lines(new);
 
     char **lined_old = split_lines(old);
     char **lined_new = split_lines(new);
-
-    
 
     int changes_size = strlen(old) + strlen(new) + 10;
     char *changes = malloc(changes_size);
     changes[0]= '\0';
     
     int offset = 0;
-
     int min_len = old_len < new_len ? old_len : new_len;
 
     for(int i=0; i<min_len; i++){
@@ -91,55 +88,165 @@ char *generate_changes(char *old, char*new){
     return changes;
 }
 
-struct commit *findCommitFromNodeHash(struct commit *head,char *nodeHash){
-    struct commit *commit = head;
-    int commitTreeNodeCount = 0;
+char* last_commit(){
+    //extract all commits timestamps from .cit
+    //return the latest commit file name
+
+    DIR *dir = opendir(".cit/");
+    if(dir == NULL){
+        perror("opendir failed");
+    } 
     
-    while(commit!=NULL){
-        commitTreeNodeCount = commit->commit_tree->node_count;
-        
-        for(int i=0; i<commitTreeNodeCount; i++){
-            if(strcmp(commit->commit_tree->nodes[i]->hash, nodeHash)==0) return commit;
-        }
-        commit = commit->parent;
+    struct dirent *entry; 
+    long latest_timestamp = 0;
+    char *latest = NULL;
+
+    while((entry = readdir(dir))!=NULL){
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        char *copy = strdup(entry->d_name);
+        char *token = strrchr(copy, '_');
+        if (token == NULL) { free(copy); continue; }
+        long timestamp = atoi(token + 1);
+
+        if(timestamp>latest_timestamp){
+            latest_timestamp = timestamp;
+            free(latest);
+            latest = strdup(entry->d_name);
+        } 
+        free(copy);
     }
 
+    printf("%s\n", latest);
+    return latest;
+    return;
+}
+
+#define MAX_NODES 256
+
+//returns a commit from a binary file
+//binray's contains format like:
+// ----------------------------------------------
+// ##commit timestamp sub_tree_count node_counts
+                                                    
+// ##node filename                              
+// ##changes                                     
+// {node1_changes}
+// ##context
+// {node1_context}
+
+
+// ##node filename
+// ##changes
+// {node2_changes}
+// ##context
+// {node2_context}
+
+
+// ##node filename
+// ##changes
+// {node2_changes}
+// ##context
+// {node2_context}
+// ------------------------------------------
+
+struct commit *read_from_binary(char *file_path){
+    struct commit *commit = malloc(sizeof(struct commit));
+    commit->commit_tree = malloc(sizeof(struct tree));
+    commit->commit_tree->nodes = malloc(sizeof(struct node*)*256);
+    
+    FILE *f = fopen(file_path, "r");
+    if(f==NULL){
+        perror("couldnt open file");
+        free(commit);
+        return NULL;
+    }
+
+    fscanf(f, "##commit %ld %ld %ld\n", &commit->created_at, &commit->commit_tree->root_count, &commit->commit_tree->node_count);
+    int node_count = commit->commit_tree->node_count;
+    for(int i=0; i<node_count; i++){
+        struct node *temp = malloc(sizeof(struct node));
+        memset(temp, 0, sizeof(struct node)); 
+        temp->nodeHeader = malloc(sizeof(struct nodeHeader));
+        temp->nodeHeader->fileName = malloc(256); 
+
+        fscanf(f, "##node %255s\n", temp->nodeHeader->fileName);
+
+        char line[1024];
+        long pos;
+        fscanf(f, " ##changes\n");
+        size_t changes_size = 0;
+        long changes_start = ftell(f);
+        while((pos=ftell(f)), fgets(line, sizeof(line),f)){
+            if(strncmp(line, "##",2)==0){fseek(f,pos,SEEK_SET);break;}
+            changes_size += strlen(line);
+        }
+
+        temp->changes = malloc(changes_size+1);
+        temp->changes[0] = '\0';
+        fseek(f, changes_start, SEEK_SET);
+        while((pos=ftell(f)),fgets(line, sizeof(line),f)) {
+            if(strncmp(line, "##",2)==0){ fseek(f,pos, SEEK_SET);break;}
+            strcat(temp->changes, line);
+        }
+
+        fscanf(f, " ##context\n");
+        size_t context_size = 0;
+
+        long context_start = 0;
+        context_start = ftell(f);
+        while ((pos = ftell(f)), fgets(line, sizeof(line), f)) {
+            if (strncmp(line, "##", 2) == 0) { fseek(f, pos, SEEK_SET); break; }
+            context_size += strlen(line);
+        }
+
+        temp->context = malloc(context_size + 1);
+        temp->context[0] = '\0';
+        fseek(f, context_start, SEEK_SET);
+        while ((pos = ftell(f)), fgets(line, sizeof(line), f)) {
+            if (strncmp(line, "##", 2) == 0) { fseek(f, pos, SEEK_SET); break; }
+            strcat(temp->context, line);
+        }
+
+        commit->commit_tree->nodes[i] = temp;        
+    }
+    fclose(f);
+    return commit;
+}
+
+struct node *old_node_version(struct node *currentNode){
+
+    char *latest_commit_file_name = last_commit();
+    struct commit *commit = read_from_binary(latest_commit_file_name);
+
+    struct node *old_version = malloc(sizeof(struct node));
+    for(int i=0; i<commit->commit_tree->node_count; i++){
+        if(strcmp(currentNode->nodeHeader->fileName, commit->commit_tree->nodes[i]->nodeHeader->fileName)==0){
+            memcpy(old_version, commit->commit_tree->nodes[i], sizeof(struct node));
+            return old_version;
+        }
+    }
     return NULL;
 }
 
-
 struct node *CreateNode(char *context, char *filename, enum NodeType nodeType){
-    //if folder we only care ab name and creation timestamp
+    //only create when encountering a file
     struct node *new_node = malloc(sizeof(struct node));
-
-    new_node->created_at = time(NULL);
-    new_node->nodeType = nodeType;
-    new_node->context = context;    
-
+    memset(new_node, 0, sizeof(struct node));
     new_node->nodeHeader = malloc(sizeof(struct nodeHeader));
-
-    strcpy(new_node->nodeHeader->fileName, filename);
-
+    new_node->nodeHeader->fileName = strdup(filename);
+    new_node->context = strdup(context);
     new_node->changes = NULL;
 
-    hash_node(new_node);
-
-    if(nodeType == FILE_NODE){
-        struct commit *node_parent = findCommitFromNodeHash(NULL,new_node->hash);
-        
-        
-        if (node_parent != NULL){
-            //get the same node from the parent of the node parent
-            struct commit *node_parent_parent = node_parent->parent;
-            
-            //TODO: access the node in the node_parent_parent
-        }else{
-            new_node->nodeHeader->index = 0;
+    if(nodeType==FILE_NODE){
+        struct node *old = old_node_version(new_node);
+        if (old != NULL){
+            new_node->changes = generate_changes(old->context, new_node->context);
+            free(old);
         }
     }
-
-    
-    return new_node;
+    return NULL;
 }
 
 struct tree *CreateTree(char *root_path) {

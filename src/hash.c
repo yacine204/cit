@@ -9,5 +9,4 @@
 void hash_node(struct node *node) {
     //node:<timestamp><filename>
     snprintf(node->hash, sizeof(node->hash), "<node>:<%ld><%s>",node->created_at, node->nodeHeader->fileName);
-
 }

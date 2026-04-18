@@ -11,6 +11,7 @@
 struct commit{
     struct tree *commit_tree;
     struct commit *parent;
+    time_t created_at;
 };
 
 struct commit *Commit(struct tree *commit_tree, struct commit *parent, char *commit_message, char *filepath);

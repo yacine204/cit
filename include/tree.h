@@ -20,15 +20,14 @@ struct node{
     char *context;
     char hash[256];
     char *changes;
-    time_t created_at;
 };
 
 struct tree{
     char *root;
-    struct node *nodes[100];
+    struct node **nodes;
     int node_count;
     int root_count;
-    struct tree *sub_trees[100];
+    struct tree **sub_trees;
 };
 
 struct node *CreateNode(char *context ,char *filename, enum NodeType nodeType); 

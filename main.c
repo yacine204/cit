@@ -12,95 +12,75 @@
 
 #define CIT "/.cit"
 
-int countLines(char *buffer){
-    int counter = 0;
-    char *copy = strdup(buffer);
-    char *token = strtok(copy, "\n");
-
-    while(token != NULL){
-        counter ++;
-        token = strtok(NULL, "\n");
-        
-    }
-    free(copy);
-    return counter;
-}
-
-char **split_lines(char *buffer) {
-
-    int capacity = countLines(buffer);
-    char **lines = malloc(capacity*(sizeof(char *)));
-    char *copy = strdup(buffer);
-    char *token = strtok(copy, "\n");
+struct commit *read_from_binary(char *file_path){
+    struct commit *commit = malloc(sizeof(struct commit));
+    commit->commit_tree = malloc(sizeof(struct tree));
+    commit->commit_tree->nodes = malloc(sizeof(struct node*)*256);
     
-
-    for(int i=0; i<capacity; i++){
-        lines[i] = strdup(token);
-        token = strtok(NULL, "\n");
+    FILE *f = fopen(file_path, "r");
+    if(f==NULL){
+        perror("couldnt open file");
+        free(commit);
+        return NULL;
     }
 
-    return lines;
-}
+    fscanf(f, "##commit %ld %ld %ld\n", &commit->created_at, &commit->commit_tree->root_count, &commit->commit_tree->node_count);
+    int node_count = commit->commit_tree->node_count;
+    for(int i=0; i<node_count; i++){
+        struct node *temp = malloc(sizeof(struct node));
+        memset(temp, 0, sizeof(struct node)); 
+        temp->nodeHeader = malloc(sizeof(struct nodeHeader));
+        temp->nodeHeader->fileName = malloc(256); 
 
+        fscanf(f, "##node %255s\n", temp->nodeHeader->fileName);
 
-char *generateChanges(char *old, char*new){
-    //if new has has strings added on the indexes + the max len of the old then automatically make it an add on
-    //if we find non similar lines before max len of old buffer we do:
-    // +new buffer line
-    // -old buffer line
-
-    int old_len = countLines(old);
-    int new_len = countLines(new);
-
-    char **lined_old = split_lines(old);
-    char **lined_new = split_lines(new);
-
-    
-
-    int changes_size = strlen(old) + strlen(new) + 10;
-    char *changes = malloc(changes_size);
-    changes[0]= '\0';
-    
-    int offset = 0;
-
-    int min_len = old_len < new_len ? old_len : new_len;
-
-    for(int i=0; i<min_len; i++){
-        if(strcmp(lined_old[i],lined_new[i])!=0){
-            offset += snprintf(changes+offset, changes_size - offset, "-%s\n+%s\n", lined_old[i], lined_new[i]);
+        char line[1024];
+        long pos;
+        fscanf(f, " ##changes\n");
+        size_t changes_size = 0;
+        long changes_start = ftell(f);
+        while((pos=ftell(f)), fgets(line, sizeof(line),f)){
+            if(strncmp(line, "##",2)==0){fseek(f,pos,SEEK_SET);break;}
+            changes_size += strlen(line);
         }
-    }
 
-    // deleted
-    for (int i = min_len; i < old_len; i++) {
-        offset += snprintf(changes + offset, changes_size - offset,
-                           "-%s\n", lined_old[i]);
-    }
-    // add ons
-    for (int i = min_len; i < new_len; i++) {
-        offset += snprintf(changes + offset, changes_size - offset,
-                           "+%s\n", lined_new[i]);
-    }
+        temp->changes = malloc(changes_size+1);
+        temp->changes[0] = '\0';
+        fseek(f, changes_start, SEEK_SET);
+        while((pos=ftell(f)),fgets(line, sizeof(line),f)) {
+            if(strncmp(line, "##",2)==0){ fseek(f,pos, SEEK_SET);break;}
+            strcat(temp->changes, line);
+        }
 
-    for (int i = 0; i < old_len; i++) free(lined_old[i]);
-    free(lined_old);
-    for (int i = 0; i < new_len; i++) free(lined_new[i]);
-    free(lined_new);
+        fscanf(f, " ##context\n");
+        size_t context_size = 0;
 
-    printf("%s", changes);
-    return changes;
+        long context_start = 0;
+        context_start = ftell(f);
+        while ((pos = ftell(f)), fgets(line, sizeof(line), f)) {
+            if (strncmp(line, "##", 2) == 0) { fseek(f, pos, SEEK_SET); break; }
+            context_size += strlen(line);
+        }
+
+        temp->context = malloc(context_size + 1);
+        temp->context[0] = '\0';
+        fseek(f, context_start, SEEK_SET);
+        while ((pos = ftell(f)), fgets(line, sizeof(line), f)) {
+            if (strncmp(line, "##", 2) == 0) { fseek(f, pos, SEEK_SET); break; }
+            strcat(temp->context, line);
+        }
+
+        commit->commit_tree->nodes[i] = temp;        
+    }
+    fclose(f);
+    return commit;
 }
-
 
 int main(int argc, char *argv[]){
-
-    char old_buffer[] = "line one\nline two\nline three\n";
-    char new_buffer[] = "hi lol\n";
-    // char count = countLines(buffer);
-    // char **final = split_lines(buffer);
-    // for(int i=0; i<count; i++) printf("%s\n",final[i]);
-    char *changes = generateChanges(old_buffer, new_buffer);
+    struct commit *commit = read_from_binary(".cit/test_commit.cit");
+    printf("node 1:\nchanges:\n%s \ncontext:\n%s", commit->commit_tree->nodes[0]->changes, commit->commit_tree->nodes[0]->context);
     return 0;
+
     //takes current directory folders
     //create a .cit folder
     //store the commits there
@@ -141,9 +121,9 @@ int main(int argc, char *argv[]){
         printf("cit initialized at -%s\n", ctime(&now));
         return 0;
     }
-    struct tree *tree = CreateTree(cwd);
-    struct commit *last = loadLastCommit(cwd);
-    struct commit *commit = Commit(tree, last, argv[2], cwd);
+    // struct tree *tree = CreateTree(cwd);
+    // struct commit *last = loadLastCommit(cwd);
+    // struct commit *commit = Commit(tree, last, argv[2], cwd);
     
     
     return 0;
