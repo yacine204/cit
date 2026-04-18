@@ -1,6 +1,6 @@
 # cit 
 
-A custom version control system . Tracks file changes and creates commits with diffs.
+A custom version control system from scratch. Tracks file changes and creates commits with diffs.
 
 ## how it works
 
